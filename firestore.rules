@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: /users/{uid}
+    // Document ID: uid
+    // Fields: email, displayName, plan, createdAt
+    
+    // Collection: /users/{uid}/folders/{folderId}
+    // Document ID: folderId
+    // Fields: name, createdAt
+
+    // Collection: /users/{uid}/files/{fileId}
+    // Document ID: fileId
+    // Fields: name, folderId, size, createdAt
+
+    // Collection: /users/{uid}/notes/{noteId}
+    // Document ID: noteId
+    // Fields: title, content, createdAt
+
+    // Collection: /users/{uid}/teamMembers/{memberId}
+    // Document ID: memberId
+    // Fields: name, role, createdAt
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /folders/{folderId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /files/{fileId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /notes/{noteId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /teamMembers/{memberId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+  }
+}

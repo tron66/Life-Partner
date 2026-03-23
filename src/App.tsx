@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sparkles, 
@@ -18,9 +18,17 @@ import {
   Quote,
   Layout,
   Menu,
-  X
+  X,
+  LogOut,
+  User as UserIcon
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth } from './firebase';
+import Auth from './components/Auth';
+import FileSection from './components/FileSection';
+import NoteSection from './components/NoteSection';
+import TeamSection from './components/TeamSection';
 
 // Initialize Gemini
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -34,6 +42,9 @@ interface PlanData {
 }
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'planner' | 'files' | 'notes' | 'team'>('planner');
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<PlanData | null>(null);
   const [formData, setFormData] = useState({
@@ -57,6 +68,22 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const planRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   const generatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +138,18 @@ export default function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
+
   return (
     <div className="min-h-screen font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {/* Background Elements */}
@@ -159,20 +198,43 @@ export default function App() {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-10 text-sm font-semibold text-slate-600">
-              {['Home', 'Features', 'Plans', 'Contact'].map((item) => (
-                <motion.a
-                  key={item}
-                  href={`#${item.toLowerCase()}`}
+              {[
+                { id: 'planner', label: 'Planner' },
+                { id: 'files', label: 'My Files' },
+                { id: 'notes', label: 'My Notes' },
+                { id: 'team', label: 'Team' }
+              ].map((item) => (
+                <motion.button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as any)}
                   whileHover={{ y: -2 }}
-                  className="hover:text-indigo-600 transition-colors relative group"
+                  className={`transition-colors relative group ${activeTab === item.id ? 'text-indigo-600' : 'hover:text-indigo-600'}`}
                 >
-                  {item}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
-                </motion.a>
+                  {item.label}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-indigo-600 transition-all ${activeTab === item.id ? 'w-full' : 'w-0 group-hover:w-full'}`} />
+                </motion.button>
               ))}
-              <button className="bg-slate-900 text-white px-6 py-2.5 rounded-2xl hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-200 transition-all active:scale-95">
-                Get Started
-              </button>
+              {user ? (
+                <div className="flex items-center gap-4 pl-4 border-l border-slate-200">
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <UserIcon className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <span className="max-w-[120px] truncate">{user.email}</span>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <button className="bg-slate-900 text-white px-6 py-2.5 rounded-2xl hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-200 transition-all active:scale-95">
+                  Get Started
+                </button>
+              )}
             </div>
 
             {/* Mobile Toggle */}
@@ -195,434 +257,391 @@ export default function App() {
               className="absolute top-24 left-6 right-6 md:hidden"
             >
               <div className="glass rounded-3xl p-6 shadow-2xl border-white/40 flex flex-col gap-4">
-                {['Home', 'Features', 'Plans', 'Contact'].map((item) => (
-                  <a
-                    key={item}
-                    href={`#${item.toLowerCase()}`}
-                    className="text-lg font-semibold text-slate-700 hover:text-indigo-600 py-2 border-b border-slate-100 last:border-0"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                {[
+                  { id: 'planner', label: 'Planner' },
+                  { id: 'files', label: 'My Files' },
+                  { id: 'notes', label: 'My Notes' },
+                  { id: 'team', label: 'Team' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id as any);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`text-lg font-semibold py-2 border-b border-slate-100 last:border-0 text-left ${activeTab === item.id ? 'text-indigo-600' : 'text-slate-700'}`}
                   >
-                    {item}
-                  </a>
+                    {item.label}
+                  </button>
                 ))}
-                <button className="w-full mt-2 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100">
-                  Get Started
-                </button>
+                {user ? (
+                  <button 
+                    onClick={() => {
+                      handleLogout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full mt-2 bg-red-50 text-red-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Sign Out
+                  </button>
+                ) : (
+                  <button className="w-full mt-2 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100">
+                    Get Started
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </nav>
 
-      <main>
-        {/* Hero Section */}
-        <section className="relative pt-24 pb-40 px-6 overflow-hidden">
-          <div className="max-w-5xl mx-auto text-center relative">
+      <main className="max-w-7xl mx-auto px-6 py-12">
+        <AnimatePresence mode="wait">
+          {activeTab === 'planner' && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -z-10"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-            >
-              <div className="inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-full bg-white/50 border border-white/80 shadow-sm backdrop-blur-sm">
-                <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-widest text-indigo-900/60">Your journey starts here</span>
-              </div>
-              
-              <h1 className="font-display text-6xl md:text-8xl font-black tracking-tight mb-10 leading-[0.95] text-slate-900">
-                Master your time.<br />
-                <span className="gradient-text">Own your future.</span>
-              </h1>
-              
-              <p className="text-xl md:text-2xl text-slate-600 mb-14 max-w-2xl mx-auto leading-relaxed font-medium">
-                The most advanced personal growth system ever built. Design a life of purpose, focus, and extraordinary results.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                <motion.button 
-                  whileHover={{ scale: 1.05, y: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => document.getElementById('planner-form')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="group relative w-full sm:w-auto px-10 py-5 bg-indigo-600 text-white rounded-[2rem] font-bold text-lg shadow-[0_20px_50px_rgba(79,70,229,0.3)] hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                  <span>Start Your Blueprint</span>
-                  <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                </motion.button>
-                
-                <motion.button 
-                  whileHover={{ scale: 1.05, y: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full sm:w-auto px-10 py-5 bg-white/80 text-slate-900 border border-slate-200 rounded-[2rem] font-bold text-lg hover:bg-white transition-all backdrop-blur-sm shadow-xl shadow-slate-200/50"
-                >
-                  Explore Features
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Daily Focus / To-Do List Section */}
-        <section className="py-12 px-6">
-          <div className="max-w-xl mx-auto">
-            <motion.div 
+              key="planner"
               initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="glass p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border-white/60"
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
             >
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-                    <CheckCircle2 className="text-white w-5 h-5" />
-                  </div>
-                  <h2 className="font-display font-bold text-xl">Daily Focus</h2>
-                </div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  {todos.filter(t => t.completed).length}/{todos.length} Done
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {todos.map((todo) => (
-                  <motion.div 
-                    key={todo.id}
-                    whileHover={{ x: 4 }}
-                    onClick={() => toggleTodo(todo.id)}
-                    className="group flex items-center gap-4 p-4 rounded-2xl bg-white/40 border border-slate-100 hover:border-indigo-200 hover:bg-white/60 transition-all cursor-pointer"
-                  >
-                    <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                      todo.completed 
-                        ? 'bg-indigo-600 border-indigo-600' 
-                        : 'border-slate-200 group-hover:border-indigo-300'
-                    }`}>
-                      {todo.completed && <CheckCircle2 className="text-white w-4 h-4" />}
-                    </div>
-                    <span className={`text-sm font-medium transition-all ${
-                      todo.completed ? 'text-slate-400 line-through' : 'text-slate-700'
-                    }`}>
-                      {todo.text}
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Features Grid */}
-        <section className="py-24 px-6 bg-white/50">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                { icon: Target, title: "Goal Alignment", desc: "Break down massive dreams into actionable, bite-sized milestones." },
-                { icon: Calendar, title: "Smart Routines", desc: "Design daily rhythms that protect your energy and focus." },
-                { icon: BrainCircuit, title: "Insights", desc: "Personalized growth strategies based on your unique challenges." }
-              ].map((feature, i) => (
-                <motion.div 
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="p-8 rounded-3xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
-                    <feature.icon className="text-indigo-600 w-6 h-6" />
-                  </div>
-                  <h3 className="font-display font-bold text-xl mb-3">{feature.title}</h3>
-                  <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Form Section */}
-        <section id="planner-form" className="py-24 px-6">
-          <div className="max-w-3xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-4xl font-bold mb-4">Let's build your blueprint</h2>
-              <p className="text-slate-600">Tell us a bit about yourself, and we will generate a custom growth plan.</p>
-            </div>
-
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="glass p-8 md:p-12 rounded-[2rem]"
-            >
-              <form onSubmit={generatePlan} className="space-y-8">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Your Name</label>
-                    <input 
-                      required
-                      type="text" 
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="e.g. Alex"
-                      className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Focus Area</label>
-                    <select 
-                      value={formData.focusArea}
-                      onChange={(e) => setFormData({...formData, focusArea: e.target.value})}
-                      className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
-                    >
-                      <option>Health & Wellness</option>
-                      <option>Career & Finance</option>
-                      <option>Relationships</option>
-                      <option>Personal Projects</option>
-                      <option>Mindset & Spirituality</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">What's your #1 goal right now?</label>
-                  <textarea 
-                    required
-                    value={formData.mainGoal}
-                    onChange={(e) => setFormData({...formData, mainGoal: e.target.value})}
-                    placeholder="Describe what you want to achieve in detail..."
-                    className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all min-h-[120px]"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">What's holding you back?</label>
-                  <input 
-                    type="text" 
-                    value={formData.challenges}
-                    onChange={(e) => setFormData({...formData, challenges: e.target.value})}
-                    placeholder="e.g. Lack of time, procrastination, technical skills..."
-                    className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Daily time available for growth</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {['15 mins', '30-60 mins', '1-2 hours', '2+ hours'].map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => setFormData({...formData, timeCommitment: time})}
-                        className={`px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
-                          formData.timeCommitment === time 
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100' 
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                      Crafting Your Plan...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-6 h-6" />
-                      Generate My Life Plan
-                    </>
-                  )}
-                </button>
-              </form>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Personalized Plan Section */}
-        <AnimatePresence>
-          {plan && (
-            <section ref={planRef} className="py-24 px-6 bg-slate-900 text-white overflow-hidden relative">
-              <div className="absolute top-0 left-0 w-full h-full opacity-20">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500 rounded-full blur-[120px]" />
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500 rounded-full blur-[120px]" />
-              </div>
-
-              <div className="max-w-5xl mx-auto relative z-10">
+              {/* Hero Section */}
+              <section className="relative pt-12 pb-24 text-center">
                 <motion.div
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
                 >
-                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
-                    <div>
-                      <span className="text-indigo-400 font-bold tracking-widest uppercase text-xs mb-4 block">Your Custom Blueprint</span>
-                      <h2 className="font-display text-4xl md:text-6xl font-bold">The {formData.name} Protocol</h2>
-                    </div>
-                    <div className="flex items-center gap-3 px-4 py-2 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
-                      <Zap className="text-yellow-400 w-5 h-5" />
-                      <span className="text-sm font-medium">Optimized for ${formData.focusArea}</span>
-                    </div>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 mb-8 rounded-full bg-white/50 border border-white/80 shadow-sm backdrop-blur-sm">
+                    <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-indigo-900/60">Your journey starts here</span>
                   </div>
+                  
+                  <h1 className="font-display text-5xl md:text-7xl font-black tracking-tight mb-10 leading-[0.95] text-slate-900">
+                    Master your time.<br />
+                    <span className="gradient-text">Own your future.</span>
+                  </h1>
+                  
+                  <p className="text-lg md:text-xl text-slate-600 mb-14 max-w-2xl mx-auto leading-relaxed font-medium">
+                    The most advanced personal growth system ever built. Design a life of purpose, focus, and extraordinary results.
+                  </p>
+                </motion.div>
+              </section>
 
-                  <div className="grid lg:grid-cols-3 gap-8">
-                    {/* Goals Column */}
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                          <Target className="text-indigo-400 w-5 h-5" />
-                        </div>
-                        <h3 className="font-display font-bold text-xl">Strategic Goals</h3>
-                      </div>
-                      {plan.goals.map((goal, i) => (
-                        <motion.div 
-                          key={i}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.2 + i * 0.1 }}
-                          className="p-5 rounded-2xl bg-white/5 border border-white/10 flex gap-4"
-                        >
-                          <div className="mt-1"><CheckCircle2 className="text-emerald-400 w-5 h-5" /></div>
-                          <p className="text-slate-300 leading-relaxed">{goal}</p>
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Routines Column */}
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                          <Calendar className="text-emerald-400 w-5 h-5" />
-                        </div>
-                        <h3 className="font-display font-bold text-xl">Daily Rhythms</h3>
-                      </div>
-                      {plan.routines.map((routine, i) => (
-                        <motion.div 
-                          key={i}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.4 + i * 0.1 }}
-                          className="p-5 rounded-2xl bg-white/5 border border-white/10 flex items-start gap-4"
-                        >
-                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
-                            {i + 1}
-                          </div>
-                          <p className="text-slate-300 leading-relaxed">{routine}</p>
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* Habits Column */}
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                          <Sparkles className="text-blue-400 w-5 h-5" />
-                        </div>
-                        <h3 className="font-display font-bold text-xl">Core Habits</h3>
-                      </div>
-                      {plan.habits.map((habit, i) => (
-                        <motion.div 
-                          key={i}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.6 + i * 0.1 }}
-                          className="p-5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between"
-                        >
-                          <span className="text-slate-300">{habit}</span>
-                          <ChevronRight className="text-white/20 w-5 h-5" />
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Advice Section */}
+              {/* Daily Focus / To-Do List Section */}
+              <section className="pb-24">
+                <div className="max-w-xl mx-auto">
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1 }}
-                    className="mt-12 p-8 md:p-12 rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-indigo-800 relative overflow-hidden"
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="glass p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border-white/60"
                   >
-                    <Quote className="absolute top-8 right-8 w-24 h-24 text-white/10 rotate-12" />
-                    <div className="relative z-10 max-w-3xl">
-                      <h3 className="font-display font-bold text-2xl mb-6 flex items-center gap-3">
-                        <BrainCircuit className="w-7 h-7" />
-                        Strategic Insight
-                      </h3>
-                      <p className="text-xl md:text-2xl text-indigo-50 font-medium leading-relaxed italic">
-                        "{plan.advice}"
-                      </p>
+                    <div className="flex items-center justify-between mb-8">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                          <CheckCircle2 className="text-white w-5 h-5" />
+                        </div>
+                        <h2 className="font-display font-bold text-xl">Daily Focus</h2>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        {todos.filter(t => t.completed).length}/{todos.length} Done
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {todos.map((todo) => (
+                        <motion.div 
+                          key={todo.id}
+                          whileHover={{ x: 4 }}
+                          onClick={() => toggleTodo(todo.id)}
+                          className="group flex items-center gap-4 p-4 rounded-2xl bg-white/40 border border-slate-100 hover:border-indigo-200 hover:bg-white/60 transition-all cursor-pointer"
+                        >
+                          <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                            todo.completed 
+                              ? 'bg-indigo-600 border-indigo-600' 
+                              : 'border-slate-200 group-hover:border-indigo-300'
+                          }`}>
+                            {todo.completed && <CheckCircle2 className="text-white w-4 h-4" />}
+                          </div>
+                          <span className={`text-sm font-medium transition-all ${
+                            todo.completed ? 'text-slate-400 line-through' : 'text-slate-700'
+                          }`}>
+                            {todo.text}
+                          </span>
+                        </motion.div>
+                      ))}
                     </div>
                   </motion.div>
+                </div>
+              </section>
 
-                  <div className="mt-16 flex flex-col sm:flex-row items-center justify-center gap-6">
-                    <button className="w-full sm:w-auto px-10 py-4 bg-white text-slate-900 rounded-2xl font-bold hover:bg-slate-100 transition-all">
-                      Download PDF Blueprint
-                    </button>
-                    <button className="w-full sm:w-auto px-10 py-4 bg-white/10 text-white border border-white/20 rounded-2xl font-bold hover:bg-white/20 transition-all">
-                      Share with Community
-                    </button>
-                  </div>
-                </motion.div>
-              </div>
-            </section>
-          )}
-        </AnimatePresence>
-
-        {/* Weekly Planner Section */}
-        <AnimatePresence>
-          {plan && (
-            <section className="py-24 px-6 bg-white">
-              <div className="max-w-7xl mx-auto">
-                <motion.div
-                  initial={{ opacity: 0, y: 40 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.8 }}
-                >
+              {/* Form Section */}
+              <section id="planner-form" className="pb-24">
+                <div className="max-w-3xl mx-auto">
                   <div className="text-center mb-16">
-                    <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">Weekly Planner</h2>
-                    <p className="text-slate-600 max-w-2xl mx-auto">Your week at a glance, optimized for your goals and available time.</p>
+                    <h2 className="font-display text-4xl font-bold mb-4">Let's build your blueprint</h2>
+                    <p className="text-slate-600">Tell us a bit about yourself, and we will generate a custom growth plan.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-                    {plan.weeklySchedule.map((dayPlan, i) => (
-                      <motion.div
-                        key={dayPlan.day}
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: i * 0.1 }}
-                        className="p-6 rounded-3xl bg-slate-50 border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50 transition-all group"
-                      >
-                        <h4 className="font-display font-bold text-lg mb-4 text-indigo-600 group-hover:scale-110 transition-transform origin-left">
-                          {dayPlan.day}
-                        </h4>
-                        <ul className="space-y-3">
-                          {dayPlan.tasks.map((task, j) => (
-                            <li key={j} className="flex items-start gap-2 text-sm text-slate-600">
-                              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                              <span>{task}</span>
-                            </li>
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    className="glass p-8 md:p-12 rounded-[2rem]"
+                  >
+                    <form onSubmit={generatePlan} className="space-y-8">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700 ml-1">Your Name</label>
+                          <input 
+                            required
+                            type="text" 
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            placeholder="e.g. Alex"
+                            className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700 ml-1">Focus Area</label>
+                          <select 
+                            value={formData.focusArea}
+                            onChange={(e) => setFormData({...formData, focusArea: e.target.value})}
+                            className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
+                          >
+                            <option>Health & Wellness</option>
+                            <option>Career & Finance</option>
+                            <option>Relationships</option>
+                            <option>Personal Projects</option>
+                            <option>Mindset & Spirituality</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700 ml-1">What's your #1 goal right now?</label>
+                        <textarea 
+                          required
+                          value={formData.mainGoal}
+                          onChange={(e) => setFormData({...formData, mainGoal: e.target.value})}
+                          placeholder="Describe what you want to achieve in detail..."
+                          className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all min-h-[120px]"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700 ml-1">What's holding you back?</label>
+                        <input 
+                          type="text" 
+                          value={formData.challenges}
+                          onChange={(e) => setFormData({...formData, challenges: e.target.value})}
+                          placeholder="e.g. Lack of time, procrastination, technical skills..."
+                          className="w-full px-5 py-4 rounded-2xl bg-white/50 border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700 ml-1">Daily time available for growth</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {['15 mins', '30-60 mins', '1-2 hours', '2+ hours'].map((time) => (
+                            <button
+                              key={time}
+                              type="button"
+                              onClick={() => setFormData({...formData, timeCommitment: time})}
+                              className={`px-4 py-3 rounded-xl text-sm font-medium transition-all border ${
+                                formData.timeCommitment === time 
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100' 
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                              }`}
+                            >
+                              {time}
+                            </button>
                           ))}
-                        </ul>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              </div>
-            </section>
+                        </div>
+                      </div>
+
+                      <button 
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                            Crafting Your Plan...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-6 h-6" />
+                            Generate My Life Plan
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </motion.div>
+                </div>
+              </section>
+
+              {/* Personalized Plan Section */}
+              <AnimatePresence>
+                {plan && (
+                  <section ref={planRef} className="pb-24">
+                    <div className="glass p-8 md:p-12 rounded-[2.5rem] shadow-2xl shadow-indigo-100/20 border-white/60 bg-slate-900 text-white overflow-hidden relative">
+                      <div className="absolute top-0 left-0 w-full h-full opacity-20">
+                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500 rounded-full blur-[120px]" />
+                        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500 rounded-full blur-[120px]" />
+                      </div>
+
+                      <div className="relative z-10">
+                        <motion.div
+                          initial={{ opacity: 0, y: 40 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.8 }}
+                        >
+                          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
+                            <div>
+                              <span className="text-indigo-400 font-bold tracking-widest uppercase text-xs mb-4 block">Your Custom Blueprint</span>
+                              <h2 className="font-display text-4xl md:text-6xl font-bold">The {formData.name} Protocol</h2>
+                            </div>
+                            <div className="flex items-center gap-3 px-4 py-2 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
+                              <Zap className="text-yellow-400 w-5 h-5" />
+                              <span className="text-sm font-medium">Optimized for {formData.focusArea}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid lg:grid-cols-3 gap-8">
+                            {/* Goals Column */}
+                            <div className="space-y-6">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                                  <Target className="text-indigo-400 w-5 h-5" />
+                                </div>
+                                <h3 className="font-display font-bold text-xl">Strategic Goals</h3>
+                              </div>
+                              {plan.goals.map((goal, i) => (
+                                <motion.div 
+                                  key={i}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.2 + i * 0.1 }}
+                                  className="p-5 rounded-2xl bg-white/5 border border-white/10 flex gap-4"
+                                >
+                                  <div className="mt-1"><CheckCircle2 className="text-emerald-400 w-5 h-5" /></div>
+                                  <p className="text-slate-300 leading-relaxed">{goal}</p>
+                                </motion.div>
+                              ))}
+                            </div>
+
+                            {/* Routines Column */}
+                            <div className="space-y-6">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                                  <Calendar className="text-emerald-400 w-5 h-5" />
+                                </div>
+                                <h3 className="font-display font-bold text-xl">Daily Rhythms</h3>
+                              </div>
+                              {plan.routines.map((routine, i) => (
+                                <motion.div 
+                                  key={i}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.4 + i * 0.1 }}
+                                  className="p-5 rounded-2xl bg-white/5 border border-white/10 flex items-start gap-4"
+                                >
+                                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
+                                    {i + 1}
+                                  </div>
+                                  <p className="text-slate-300 leading-relaxed">{routine}</p>
+                                </motion.div>
+                              ))}
+                            </div>
+
+                            {/* Habits Column */}
+                            <div className="space-y-6">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                  <Sparkles className="text-blue-400 w-5 h-5" />
+                                </div>
+                                <h3 className="font-display font-bold text-xl">Core Habits</h3>
+                              </div>
+                              {plan.habits.map((habit, i) => (
+                                <motion.div 
+                                  key={i}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.6 + i * 0.1 }}
+                                  className="p-5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between"
+                                >
+                                  <span className="text-slate-300">{habit}</span>
+                                  <ChevronRight className="text-white/20 w-5 h-5" />
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Advice Section */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 1 }}
+                            className="mt-12 p-8 md:p-12 rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-indigo-800 relative overflow-hidden"
+                          >
+                            <Quote className="absolute top-8 right-8 w-24 h-24 text-white/10 rotate-12" />
+                            <div className="relative z-10 max-w-3xl">
+                              <h3 className="font-display font-bold text-2xl mb-6 flex items-center gap-3">
+                                <BrainCircuit className="w-7 h-7" />
+                                Strategic Insight
+                              </h3>
+                              <p className="text-xl md:text-2xl text-indigo-50 font-medium leading-relaxed italic">
+                                "{plan.advice}"
+                              </p>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+
+          {activeTab === 'files' && (
+            <motion.div
+              key="files"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <FileSection userId={user.uid} />
+            </motion.div>
+          )}
+
+          {activeTab === 'notes' && (
+            <motion.div
+              key="notes"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <NoteSection userId={user.uid} />
+            </motion.div>
+          )}
+
+          {activeTab === 'team' && (
+            <motion.div
+              key="team"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <TeamSection userId={user.uid} />
+            </motion.div>
           )}
         </AnimatePresence>
       </main>
@@ -661,7 +680,6 @@ export default function App() {
           </div>
           <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400">
             <p>© 2026 LifePlanner. All rights reserved.</p>
-            <p> Trons Creation </p>
             <div className="flex gap-6">
               <a href="#" className="hover:text-indigo-600 transition-colors">Twitter</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">LinkedIn</a>

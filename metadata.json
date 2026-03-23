@@ -1,5 +1,9 @@
 {
-  "name": "Life Planner",
-  "description": "A modern, clean tool to organize your goals, routines, and personal growth with personalized plans.",
-  "requestFramePermissions": []
+  "name": "VaultFlow",
+  "description": "A secure and powerful personal growth and file management dashboard.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
 }
