@@ -680,6 +680,7 @@ export default function App() {
           </div>
           <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400">
             <p>© 2026 LifePlanner. All rights reserved.</p>
+            <p>Trons circle</p>
             <div className="flex gap-6">
               <a href="#" className="hover:text-indigo-600 transition-colors">Twitter</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">LinkedIn</a>
