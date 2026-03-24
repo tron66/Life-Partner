@@ -29,6 +29,7 @@ import Auth from './components/Auth';
 import FileSection from './components/FileSection';
 import NoteSection from './components/NoteSection';
 import TeamSection from './components/TeamSection';
+import ProgressDashboard from './components/ProgressDashboard';
 
 // Initialize Gemini
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -44,7 +45,7 @@ interface PlanData {
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'planner' | 'files' | 'notes' | 'team'>('planner');
+  const [activeTab, setActiveTab] = useState<'planner' | 'files' | 'notes' | 'team' | 'progress'>('planner');
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<PlanData | null>(null);
   const [formData, setFormData] = useState({
@@ -202,7 +203,8 @@ export default function App() {
                 { id: 'planner', label: 'Planner' },
                 { id: 'files', label: 'My Files' },
                 { id: 'notes', label: 'My Notes' },
-                { id: 'team', label: 'Team' }
+                { id: 'team', label: 'Team' },
+                { id: 'progress', label: 'Progress' }
               ].map((item) => (
                 <motion.button
                   key={item.id}
@@ -261,7 +263,8 @@ export default function App() {
                   { id: 'planner', label: 'Planner' },
                   { id: 'files', label: 'My Files' },
                   { id: 'notes', label: 'My Notes' },
-                  { id: 'team', label: 'Team' }
+                  { id: 'team', label: 'Team' },
+                  { id: 'progress', label: 'Progress' }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -643,6 +646,18 @@ export default function App() {
               <TeamSection userId={user.uid} />
             </motion.div>
           )}
+
+          {activeTab === 'progress' && (
+            <motion.div
+              key="progress"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ProgressDashboard userId={user.uid} />
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -680,7 +695,6 @@ export default function App() {
           </div>
           <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400">
             <p>© 2026 LifePlanner. All rights reserved.</p>
-            <p>Trons circle</p>
             <div className="flex gap-6">
               <a href="#" className="hover:text-indigo-600 transition-colors">Twitter</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">LinkedIn</a>

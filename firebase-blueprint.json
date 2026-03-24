@@ -55,6 +55,42 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "createdAt"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "User goal tracking",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "targetValue": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "unit": { "type": "string" },
+        "deadline": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "targetValue", "currentValue", "createdAt"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "User habit definition",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["daily", "weekly"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "frequency", "createdAt"]
+    },
+    "HabitLog": {
+      "title": "HabitLog",
+      "description": "User habit completion log",
+      "type": "object",
+      "properties": {
+        "habitId": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["habitId", "completed", "date"]
     }
   },
   "firestore": {
@@ -77,6 +113,18 @@
     "/users/{uid}/teamMembers/{memberId}": {
       "schema": "TeamMember",
       "description": "User team members"
+    },
+    "/users/{uid}/goals/{goalId}": {
+      "schema": "Goal",
+      "description": "User goals"
+    },
+    "/users/{uid}/habits/{habitId}": {
+      "schema": "Habit",
+      "description": "User habits"
+    },
+    "/users/{uid}/habitLogs/{logId}": {
+      "schema": "HabitLog",
+      "description": "User habit logs"
     }
   }
 }

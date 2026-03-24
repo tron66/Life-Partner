@@ -1,6 +1,6 @@
 {
   "name": "VaultFlow",
-  "description": "A secure and powerful personal growth and file management dashboard.",
+  "description": "A secure and powerful personal growth dashboard with file management, note-taking, and advanced progress tracking for goals and habits.",
   "requestFramePermissions": [
     "camera",
     "microphone",

@@ -53,6 +53,18 @@ service cloud.firestore {
       match /teamMembers/{memberId} {
         allow read, write: if isOwner(uid);
       }
+
+      match /goals/{goalId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /habits/{habitId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /habitLogs/{logId} {
+        allow read, write: if isOwner(uid);
+      }
     }
   }
 }
